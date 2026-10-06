@@ -41,7 +41,8 @@ jobs:
 
       - name: Błędy kompilacji
         if: failure()
-        run: grep -E "(error|warning: unreachable):" build.log | sort -u | head -100 || true
+        run: |
+          grep -E "error:" build.log | sort -u | head -100 || true
 
       - name: Sprawdź paczkę
         run: |
