@@ -13,11 +13,16 @@ final class FloatingManager {
     private var store: LibraryStore { LibraryStore.shared }
 
     func start() {
-        store.$library
-            .map { ($0.desktop, $0.settings.desktopLocked) }
-            .removeDuplicates { $0.0 == $1.0 && $0.1 == $1.1 }
+        let library: AnyPublisher<Library, Never> = store.$library.eraseToAnyPublisher()
+        library
+            .map { (lib: Library) -> DesktopState in
+                DesktopState(items: lib.desktop, locked: lib.settings.desktopLocked)
+            }
+            .removeDuplicates()
             .receive(on: RunLoop.main)
-            .sink { [weak self] value in self?.sync(items: value.0, locked: value.1) }
+            .sink { [weak self] (state: DesktopState) in
+                self?.sync(items: state.items, locked: state.locked)
+            }
             .store(in: &cancellables)
         NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in
@@ -56,6 +61,11 @@ final class FloatingManager {
         panel.orderFront(nil)
         return panel
     }
+}
+
+private struct DesktopState: Equatable {
+    let items: [DesktopItem]
+    let locked: Bool
 }
 
 final class DesktopPanel: NSPanel {
