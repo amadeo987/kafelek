@@ -1,0 +1,85 @@
+name: Build
+
+on:
+  push:
+    branches: ["**"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Xcode
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: XcodeGen
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Build (podpis lokalny, uniwersalny arm64 + x86_64)
+        run: |
+          set -o pipefail
+          xcodebuild -project Kafelek.xcodeproj -scheme Kafelek -configuration Release \
+            -derivedDataPath build -destination 'generic/platform=macOS' \
+            ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= \
+            MARKETING_VERSION="0.1.${GITHUB_RUN_NUMBER}" CURRENT_PROJECT_VERSION="${GITHUB_RUN_NUMBER}" \
+            -quiet build 2>&1 | tee build.log
+
+      - name: Sprawdź paczkę
+        run: |
+          APP=build/Build/Products/Release/Kafelek.app
+          ls -la "$APP/Contents" "$APP/Contents/PlugIns"
+          plutil -p "$APP/Contents/Info.plist" | grep -E "CFBundle(Short)?Version|LSUIElement"
+          codesign -dv --entitlements - "$APP/Contents/PlugIns/KafelekWidget.appex" 2>&1
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          lipo -archs "$APP/Contents/MacOS/Kafelek"
+
+      - name: Spakuj (zip + dmg)
+        run: |
+          APP=build/Build/Products/Release/Kafelek.app
+          ditto -c -k --sequesterRsrc --keepParent "$APP" Kafelek.zip
+          mkdir -p dmg && cp -R "$APP" dmg/ && ln -s /Applications dmg/Applications
+          hdiutil create -volname "Kafelek" -srcfolder dmg -ov -format UDZO Kafelek.dmg
+          ls -la Kafelek.zip Kafelek.dmg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Kafelek-${{ github.run_number }}
+          path: |
+            Kafelek.zip
+            Kafelek.dmg
+
+      - name: Wydanie na GitHub Releases
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/claude/lucid-pasteur-vkz6r8'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v0.1.${GITHUB_RUN_NUMBER}"
+          {
+            git log -1 --pretty=%s
+            echo
+            echo "Instalacja / aktualizacja – wklej w Terminal:"
+            echo
+            echo '```'
+            echo "curl -fsSL https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/install.sh | bash"
+            echo '```'
+          } > notes.md
+          gh release create "$TAG" Kafelek.zip Kafelek.dmg Scripts/install.sh \
+            --target "$GITHUB_SHA" \
+            --title "Kafelek 0.1.${GITHUB_RUN_NUMBER}" \
+            --notes-file notes.md \
+            --latest

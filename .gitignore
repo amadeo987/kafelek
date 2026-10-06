@@ -1,0 +1,9 @@
+.DS_Store
+build/
+DerivedData/
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+Kafelek.zip
+Kafelek.dmg
+dmg/
