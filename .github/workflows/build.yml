@@ -99,7 +99,7 @@ jobs:
             echo "curl -fsSL https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/install.sh | bash"
             echo '```'
           } > notes.md
-          gh release create "$TAG" Kafelek.zip Kafelek.dmg Scripts/install.sh \
+          gh release create "$TAG" Kafelek.zip Kafelek.dmg Scripts/install.sh Scripts/uninstall.sh \
             --target "$GITHUB_SHA" \
             --title "Kafelek 0.1.${GITHUB_RUN_NUMBER}" \
             --notes-file notes.md \

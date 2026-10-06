@@ -45,10 +45,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     func applicationDidFinishLaunching(_ notification: Notification) {
         AppDelegate.shared = self
         buildMainMenu()
-        setupStatusItem()
+        updateStatusItem()
 
         store.onChange = { [weak self] in
             self?.hub.libraryChanged()
+            self?.updateStatusItem()
         }
         server.handler = { req in await AppDelegate.route(req) }
         server.start()
@@ -61,6 +62,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         }
         if !store.library.settings.firstRunDone {
             store.library.settings.firstRunDone = true
+            openMain(selecting: nil)
+        } else if !launchedAtLogin {
+            // Uruchomiony ręcznie (Launchpad, Spotlight, Aplikacje) – pokaż okno.
             openMain(selecting: nil)
         }
         if store.library.settings.autoUpdateCheck {
@@ -155,6 +159,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
 
     // MARK: Pasek menu
+
+    /// Start przy logowaniu – wtedy Kafelek działa po cichu w tle, bez okna.
+    private var launchedAtLogin: Bool {
+        ProcessInfo.processInfo.systemUptime < 240
+    }
+
+    /// Ikonka na pasku menu jest opcjonalna (domyślnie wyłączona).
+    private func updateStatusItem() {
+        let want = store.library.settings.showMenuBarIcon
+        if want && statusItem == nil {
+            setupStatusItem()
+        } else if !want, let item = statusItem {
+            NSStatusBar.system.removeStatusItem(item)
+            statusItem = nil
+        }
+    }
 
     private func setupStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)

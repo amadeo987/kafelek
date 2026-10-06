@@ -46,6 +46,10 @@ struct StyleEditor: View {
             switch style.background {
             case .solid:
                 ColorPicker("Kolor tła", selection: hexBinding($style.color1), supportsOpacity: true)
+            case .glass:
+                Text("Przezroczyste, rozmyte tło – jak systemowy widżet Bateria.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
             case .gradient:
                 ColorPicker("Kolor 1", selection: hexBinding($style.color1), supportsOpacity: true)
                 ColorPicker("Kolor 2", selection: hexBinding($style.color2), supportsOpacity: true)

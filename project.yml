@@ -74,6 +74,9 @@ targets:
       properties:
         com.apple.security.app-sandbox: true
         com.apple.security.network.client: true
+        # Widżet czyta projekty i zdjęcia prosto z folderu aplikacji (działa nawet gdy Kafelek jest wyłączony).
+        com.apple.security.temporary-exception.files.home-relative-path.read-only:
+          - "/Library/Application Support/Kafelek/"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: pl.amadeo.kafelek.widget

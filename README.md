@@ -13,6 +13,14 @@ curl -fsSL https://github.com/amadeo987/kafelek/releases/latest/download/install
 
 Skrypt pobierze najnowszą wersję, wrzuci `Kafelek.app` do **Aplikacji** i ją uruchomi. Ta sama komenda służy do aktualizacji. Aplikacja umie też aktualizować się sama (Ustawienia → Aktualizacje).
 
+**Odinstalowanie** (Twoje widżety zostają i wrócą po ponownej instalacji):
+
+```bash
+curl -fsSL https://github.com/amadeo987/kafelek/releases/latest/download/uninstall.sh | bash
+```
+
+Żeby usunąć też wszystkie widżety i zdjęcia, dopisz na końcu ` -s -- --all`.
+
 **Bez Terminala:** pobierz `Kafelek.dmg` z [Releases](https://github.com/amadeo987/kafelek/releases/latest), otwórz go i przeciągnij ikonę do **Aplikacji**. Przy pierwszym uruchomieniu macOS powie, że nie może zweryfikować dewelopera. Wtedy wejdź w **Ustawienia systemowe → Prywatność i ochrona**, przewiń w dół i kliknij **Otwórz mimo to**. To jednorazowe.
 
 > Aplikacja jest podpisana lokalnie („Sign to Run Locally”). Nie potrzebuje płatnego konta Apple, Xcode ani App Store i **nic nie wygasa po 7 dniach**.
@@ -46,7 +54,8 @@ Do tego:
 - **Styl:** 12 motywów, kolor albo gradient albo zdjęcie w tle, kolor tekstu i akcentu, czcionka, grubość, wyrównanie, wielkość, ramka.
 - **Harmonogramy** (jak w Widgetsmith): jeden widżet pokazuje różne kafelki o różnych porach i w różne dni.
 - **Kafelki pływające:** okienka na tapecie bez limitów macOS, z dowolną skalą. Odblokowujesz układ i przeciągasz myszką.
-- **Pasek menu:** szybki podgląd limitów AI, odświeżanie, blokada układu.
+- **Działa niewidocznie:** bez ikonki na pasku menu (można włączyć w Ustawieniach). Okno otwierasz z Launchpada albo Spotlight.
+- **Trzy rodzaje widżetów w macOS:** Kafelek (Twoje projekty), Zdjęcia (zdjęcie albo zmieniający się album) i Limity AI.
 
 ## Limity Claude i Codex
 

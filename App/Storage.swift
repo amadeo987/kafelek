@@ -31,17 +31,31 @@ enum AppPaths {
 enum PhotoStore {
     private static let cache = NSCache<NSString, NSImage>()
 
-    /// Kopiuje i zmniejsza zdjęcie (max 1000 px), zwraca jego identyfikator.
+    /// Kopiuje i zmniejsza zdjęcie (max 1600 px), zwraca jego identyfikator.
     static func importImage(from url: URL) -> String? {
-        guard let image = NSImage(contentsOf: url) else { return nil }
+        guard let image = ImageLoader.thumbnail(at: url, maxPixel: 1600) ?? NSImage(contentsOf: url) else { return nil }
+        return save(image)
+    }
+
+    static func importImage(data: Data) -> String? {
+        guard let image = ImageLoader.thumbnail(data: data, maxPixel: 1600) ?? NSImage(data: data) else { return nil }
+        return save(image)
+    }
+
+    private static func save(_ image: NSImage) -> String? {
         let id = UUID().uuidString
-        guard let data = jpegData(image, maxSide: 1000) else { return nil }
+        guard let data = jpegData(image, maxSide: 1600) else { return nil }
         do {
             try data.write(to: file(id), options: .atomic)
             return id
         } catch {
             return nil
         }
+    }
+
+    static func delete(_ id: String) {
+        cache.removeObject(forKey: id as NSString)
+        try? FileManager.default.removeItem(at: file(id))
     }
 
     static func file(_ id: String) -> URL {
@@ -119,10 +133,24 @@ final class LibraryStore: ObservableObject {
 
     private init() {
         if let data = try? Data(contentsOf: AppPaths.library),
-           let lib = try? KJSON.decoder.decode(Library.self, from: data) {
+           var lib = try? KJSON.decoder.decode(Library.self, from: data) {
+            if lib.version < 2 {
+                // v1 nie znało rozmiarów – dopasuj je i odśwież wygląd limitów AI.
+                for i in lib.designs.indices {
+                    let k = lib.designs[i].kind
+                    lib.designs[i].size = [.ai, .note, .weather, .astronomy].contains(k) ? .medium : .small
+                    if k == .ai, lib.designs[i].style.color1 == "#2B1A14",
+                       let black = ThemePreset.all.first(where: { $0.id == "black" }) {
+                        black.apply(to: &lib.designs[i].style)
+                        lib.designs[i].ai.display = .bars
+                    }
+                }
+                lib.version = 2
+            }
             library = lib
         } else {
             var lib = Library()
+            lib.version = 2
             lib.designs = Templates.starter
             library = lib
             save()
@@ -155,9 +183,10 @@ final class LibraryStore: ObservableObject {
     }
 
     @discardableResult
-    func add(from template: Design) -> Design {
+    func add(from template: Design, size: KafelekSize? = nil) -> Design {
         var d = template
         d.id = UUID()
+        if let size { d.size = size }
         d.createdAt = Date()
         library.designs.append(d)
         return d

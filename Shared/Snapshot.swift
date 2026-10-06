@@ -68,7 +68,7 @@ enum AIProvider: String, Codable {
     var colorHex: String {
         switch self {
         case .claude: "#D97757"
-        case .codex: "#10A37F"
+        case .codex: "#3B82F6"
         }
     }
 

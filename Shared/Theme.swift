@@ -141,7 +141,8 @@ struct ThemePreset: Identifiable {
 
     static let all: [ThemePreset] = [
         ThemePreset(id: "black", name: "Czerń", background: .solid, color1: "#000000", color2: "#1C1C1E", text: "#FFFFFF", accent: "#FF9F0A"),
-        ThemePreset(id: "graphite", name: "Grafit", background: .gradient, color1: "#3A3A3C", color2: "#1C1C1E", text: "#FFFFFF", accent: "#64D2FF"),
+        ThemePreset(id: "glass", name: "Szkło", background: .glass, color1: "#000000", color2: "#1C1C1E", text: "#FFFFFF", accent: "#30D158"),
+        ThemePreset(id: "graphite", name: "Grafit", background: .solid, color1: "#1C1C1E", color2: "#1C1C1E", text: "#FFFFFF", accent: "#64D2FF"),
         ThemePreset(id: "white", name: "Biel", background: .solid, color1: "#FFFFFF", color2: "#F2F2F7", text: "#1C1C1E", accent: "#FF3B30"),
         ThemePreset(id: "paper", name: "Papier", background: .solid, color1: "#F3EBDD", color2: "#E8DCC6", text: "#2B2118", accent: "#1F4FD8", font: .serif),
         ThemePreset(id: "claude", name: "Claude", background: .gradient, color1: "#2B1A14", color2: "#141110", text: "#F5EDE6", accent: "#D97757"),

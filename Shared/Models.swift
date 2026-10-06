@@ -95,11 +95,12 @@ enum DesignKind: String, Codable, CaseIterable, Identifiable {
 // MARK: - Styl
 
 enum BackgroundKind: String, Codable, CaseIterable, Identifiable {
-    case solid, gradient, photo
+    case solid, glass, gradient, photo
     var id: String { rawValue }
     var title: String {
         switch self {
         case .solid: "Kolor"
+        case .glass: "Szkło"
         case .gradient: "Gradient"
         case .photo: "Zdjęcie"
         }
@@ -401,17 +402,50 @@ struct CountdownOptions: Codable, Hashable {
     }
 }
 
+enum PhotoAlign: String, Codable, CaseIterable, Identifiable {
+    case top, center, bottom
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .top: "Góra"
+        case .center: "Środek"
+        case .bottom: "Dół"
+        }
+    }
+}
+
 struct PhotoOptions: Codable, Hashable {
-    var photoID: String?
+    /// Jedno albo kilka zdjęć – przy kilku zmieniają się co `intervalMinutes`.
+    var photoIDs: [String] = []
+    var intervalMinutes = 60
     var caption = ""
     var fill = true
+    var align: PhotoAlign = .center
 
     init() {}
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        photoID = c.v(.photoID, photoID)
+        photoIDs = c.v(.photoIDs, photoIDs)
+        intervalMinutes = c.v(.intervalMinutes, intervalMinutes)
         caption = c.v(.caption, caption)
         fill = c.v(.fill, fill)
+        align = c.v(.align, align)
+    }
+
+    /// Które zdjęcie jest widoczne w danej chwili (stałe dla przedziału czasu – działa tak samo w widżecie i w aplikacji).
+    func currentID(at date: Date) -> String? {
+        guard !photoIDs.isEmpty else { return nil }
+        let step = Double(max(1, intervalMinutes)) * 60
+        let slot = Int(date.timeIntervalSince1970 / step)
+        return photoIDs[((slot % photoIDs.count) + photoIDs.count) % photoIDs.count]
+    }
+
+    /// Najbliższe momenty zmiany zdjęcia.
+    func switchDates(from start: Date, count: Int) -> [Date] {
+        guard photoIDs.count > 1 else { return [] }
+        let step = Double(max(1, intervalMinutes)) * 60
+        let first = (start.timeIntervalSince1970 / step).rounded(.down) * step + step
+        return (0..<count).map { Date(timeIntervalSince1970: first + Double($0) * step) }
     }
 }
 
@@ -450,6 +484,8 @@ struct Design: Codable, Identifiable, Hashable {
     var id = UUID()
     var name = "Nowy kafelek"
     var kind: DesignKind = .clock
+    /// Rozmiar, dla którego projekt powstał (grupowanie i podgląd).
+    var size: KafelekSize = .small
     var style = Style()
     var clock = ClockOptions()
     var date = DateOptions()
@@ -470,6 +506,7 @@ struct Design: Codable, Identifiable, Hashable {
         id = c.v(.id, id)
         name = c.v(.name, name)
         kind = c.v(.kind, kind)
+        size = c.v(.size, size)
         style = c.v(.style, style)
         clock = c.v(.clock, clock)
         date = c.v(.date, date)
@@ -492,11 +529,19 @@ struct Design: Codable, Identifiable, Hashable {
         }
     }
 
-    /// Identyfikatory zdjęć używanych przez kafelek.
+    /// Wszystkie zdjęcia używane przez kafelek.
     var photoIDs: [String] {
         var ids: [String] = []
         if style.background == .photo, let p = style.photoID { ids.append(p) }
-        if kind == .photo, let p = photo.photoID { ids.append(p) }
+        if kind == .photo { ids.append(contentsOf: photo.photoIDs) }
+        return ids
+    }
+
+    /// Zdjęcia potrzebne do narysowania kafelka w danej chwili.
+    func photoIDs(at date: Date) -> [String] {
+        var ids: [String] = []
+        if style.background == .photo, let p = style.photoID { ids.append(p) }
+        if kind == .photo, let p = photo.currentID(at: date) { ids.append(p) }
         return ids
     }
 }
@@ -609,6 +654,7 @@ struct AppSettings: Codable, Hashable {
     var claudeKeychainEnabled = true
     var autoUpdateCheck = true
     var desktopLocked = true
+    var showMenuBarIcon = false
     var launchAtLoginAsked = false
     var firstRunDone = false
 
@@ -620,6 +666,7 @@ struct AppSettings: Codable, Hashable {
         claudeKeychainEnabled = c.v(.claudeKeychainEnabled, claudeKeychainEnabled)
         autoUpdateCheck = c.v(.autoUpdateCheck, autoUpdateCheck)
         desktopLocked = c.v(.desktopLocked, desktopLocked)
+        showMenuBarIcon = c.v(.showMenuBarIcon, showMenuBarIcon)
         launchAtLoginAsked = c.v(.launchAtLoginAsked, launchAtLoginAsked)
         firstRunDone = c.v(.firstRunDone, firstRunDone)
     }

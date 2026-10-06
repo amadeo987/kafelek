@@ -54,6 +54,13 @@ struct KafelekBackground: View {
             switch style.background {
             case .solid:
                 Color(hex: style.color1)
+            case .glass:
+                if ctx.isWidget {
+                    Color.clear
+                } else {
+                    GlassView()
+                    Color.white.opacity(0.06)
+                }
             case .gradient:
                 LinearGradient(colors: [Color(hex: style.color1), Color(hex: style.color2)],
                                startPoint: startPoint, endPoint: endPoint)
@@ -102,7 +109,27 @@ struct KafelekTile: View {
         }
         .frame(width: ctx.size.points.width, height: ctx.size.points.height)
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        .overlay {
+            if design.style.background == .glass {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5)
+            }
+        }
     }
+}
+
+/// Rozmyte „szkło” jak w systemowych widżetach (tylko w aplikacji i kafelkach pływających;
+/// w natywnym widżecie robi to system przez containerBackground).
+struct GlassView: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let v = NSVisualEffectView()
+        v.material = .hudWindow
+        v.blendingMode = .behindWindow
+        v.state = .active
+        return v
+    }
+
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }
 
 /// Komunikat w kafelku, gdy brakuje danych.

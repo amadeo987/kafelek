@@ -261,6 +261,9 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section("Ogólne") {
+                Toggle("Pokazuj ikonkę na pasku menu", isOn: $store.library.settings.showMenuBarIcon)
+                Text("Kafelek nie musi być widoczny – działa po cichu w tle i tylko dostarcza dane widżetom. Okno otworzysz z Launchpada albo Spotlight (⌘ Spacja → Kafelek).")
+                    .font(.caption).foregroundStyle(.secondary)
                 Toggle("Uruchamiaj przy logowaniu (potrzebne, żeby widżety miały świeże dane)", isOn: Binding(
                     get: { loginEnabled },
                     set: { on in
@@ -313,13 +316,14 @@ struct HelpView: View {
                 Text("Jak dodać widżet Kafelek").font(.largeTitle.bold())
                 step(1, "Zaprojektuj kafelek", "Galeria wzorów → kliknij wzór → zmień kolory, czcionkę, opcje. Kafelków możesz mieć dowolnie dużo.")
                 step(2, "Otwórz edycję widżetów", "Kliknij prawym przyciskiem na pustym miejscu tapety → **Edytuj widżety…**")
-                step(3, "Znajdź Kafelek", "Wpisz „Kafelek” w wyszukiwarce galerii widżetów i przeciągnij wybrany rozmiar (mały, średni, duży, bardzo duży) na pulpit.")
+                step(3, "Znajdź Kafelek", "Wpisz „Kafelek” w wyszukiwarce. Są trzy rodzaje: **Kafelek** (Twoje projekty), **Zdjęcia** (zdjęcie lub album) i **Limity AI**. Przeciągnij wybrany rozmiar na pulpit.")
                 step(4, "Wybierz swój kafelek", "Kliknij prawym na nowym widżecie → **Edytuj „Kafelek”** → w polu **Kafelek** wybierz projekt albo harmonogram.")
                 step(5, "Powtarzaj", "Każdy widżet może pokazywać inny projekt – dodaj ich tyle, ile chcesz.")
                 Divider()
                 Text("Wskazówki").font(.title2.bold())
                 Text("""
-                • Kafelek musi działać w tle (ikonka ▦ na pasku menu) – wtedy widżety mają świeże dane. Włącz „Uruchamiaj przy logowaniu”.
+                • Kafelek działa niewidocznie w tle i odświeża dane (limity AI, kalendarz). Zdjęcia, notatki i zegary działają nawet gdy jest wyłączony.
+                • Okno otworzysz z Launchpada albo przez Spotlight (⌘ Spacja → Kafelek).
                 • Gdy pulpit jest „przygaszony” (aktywne okno aplikacji), macOS może pokazywać widżety w odcieniach szarości. W Ustawieniach systemowych → Biurko i Dock → Styl widżetów wybierz **Pełny kolor**.
                 • Jeśli widżet Kafelek nie pojawia się w galerii, uruchom aplikację raz z folderu Aplikacje i odczekaj chwilę – albo użyj „Kafelków na pulpicie”, które działają zawsze.
                 • Kółko przy przypomnieniu odhacza je od razu.

@@ -226,7 +226,7 @@ final class DataHub: ObservableObject {
             WidgetCenter.shared.reloadAllTimelines()
         }
         reloadWork = work
-        let delay = since >= minGap ? 0.5 : (minGap - since)
+        let delay = since >= minGap ? 1.2 : (minGap - since)
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
 }

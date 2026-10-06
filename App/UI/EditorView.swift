@@ -1,5 +1,13 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import PhotosUI
+
+enum EditorTab: String, CaseIterable, Identifiable {
+    case widget = "Widżet"
+    case style = "Styl"
+    case photos = "Zdjęcia"
+    var id: String { rawValue }
+}
 
 struct EditorView: View {
     let designID: UUID
@@ -8,54 +16,47 @@ struct EditorView: View {
     @ObservedObject private var hub = DataHub.shared
     @State private var draft = Design()
     @State private var loaded = false
-    @State private var previewSize: KafelekSize = .small
+    @State private var tab: EditorTab = .widget
 
     var body: some View {
-        HSplitView {
-            Form {
-                Section("Kafelek") {
-                    TextField("Nazwa", text: $draft.name)
-                    Picker("Rodzaj", selection: $draft.kind) {
-                        ForEach(DesignKind.allCases) { k in
-                            Label(k.title, systemImage: k.symbol).tag(k)
-                        }
-                    }
-                }
-                KindOptionsEditor(design: $draft)
-                StyleEditor(style: $draft.style)
-                Section("Akcje") {
-                    Menu {
-                        ForEach(KafelekSize.allCases) { size in
-                            Button(size.label + " – " + size.name) {
-                                store.addToDesktop(ref: SlotRef.design(draft.id).raw, size: size)
-                            }
-                        }
-                    } label: {
-                        Label("Połóż na pulpicie jako kafelek pływający", systemImage: "macwindow.badge.plus")
-                    }
-                    HStack {
-                        Button {
-                            if let c = store.duplicate(draft.id) { Navigation.shared.selection = .design(c.id) }
-                        } label: { Label("Duplikuj", systemImage: "plus.square.on.square") }
-                        Spacer()
-                        Button(role: .destructive) {
-                            store.delete(draft.id)
-                            Navigation.shared.selection = .gallery
-                        } label: { Label("Usuń kafelek", systemImage: "trash") }
-                    }
-                }
-            }
-            .formStyle(.grouped)
-            .frame(minWidth: 400, idealWidth: 440, maxWidth: 560)
-
+        HStack(spacing: 0) {
             preview
-                .frame(minWidth: 440, maxWidth: .infinity, maxHeight: .infinity)
+                .frame(minWidth: 420, maxWidth: .infinity, maxHeight: .infinity)
+            Divider()
+            VStack(spacing: 0) {
+                Picker("", selection: $tab) {
+                    ForEach(EditorTab.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                Form {
+                    switch tab {
+                    case .widget: widgetTab
+                    case .style: StyleEditor(style: $draft.style)
+                    case .photos: PhotosEditor(design: $draft)
+                    }
+                }
+                .formStyle(.grouped)
+            }
+            .frame(minWidth: 400, idealWidth: 440, maxWidth: 520)
         }
         .navigationTitle(draft.name)
+        .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button {
+                    Navigation.shared.selection = .gallery
+                } label: {
+                    Label("Moje widżety", systemImage: "chevron.left")
+                }
+                .help("Wróć do moich widżetów")
+            }
+        }
         .onAppear {
             if let d = store.design(designID) {
                 draft = d
-                previewSize = (d.kind == .ai || d.kind == .weather) ? .medium : .small
+                if d.kind == .photo && d.photo.photoIDs.isEmpty { tab = .photos }
             }
             loaded = true
         }
@@ -64,45 +65,259 @@ struct EditorView: View {
         }
     }
 
+    @ViewBuilder private var widgetTab: some View {
+        Section {
+            TextField("Nazwa", text: $draft.name)
+            Picker("Rodzaj", selection: $draft.kind) {
+                ForEach(DesignKind.allCases) { k in
+                    Label(k.title, systemImage: k.symbol).tag(k)
+                }
+            }
+        }
+        KindOptionsEditor(design: $draft)
+        Section("Gdzie go postawić") {
+            Text("Na pulpicie: prawy klik na tapecie → **Edytuj widżety** → wyszukaj **Kafelek** → przeciągnij rozmiar → prawy klik na widżecie → **Edytuj** → wybierz **\(draft.name)**.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            Menu {
+                ForEach(KafelekSize.allCases) { size in
+                    Button(size.label + " – " + size.name) {
+                        store.addToDesktop(ref: SlotRef.design(draft.id).raw, size: size)
+                    }
+                }
+            } label: {
+                Label("Albo połóż jako kafelek pływający", systemImage: "macwindow.badge.plus")
+            }
+        }
+        Section {
+            HStack {
+                Button {
+                    if let c = store.duplicate(draft.id) { Navigation.shared.selection = .design(c.id) }
+                } label: { Label("Duplikuj", systemImage: "plus.square.on.square") }
+                Spacer()
+                Button(role: .destructive) {
+                    store.delete(draft.id)
+                    Navigation.shared.selection = .gallery
+                } label: { Label("Usuń", systemImage: "trash") }
+            }
+        }
+    }
+
     private var preview: some View {
         VStack(spacing: 18) {
-            Picker("Rozmiar", selection: $previewSize) {
-                ForEach(KafelekSize.allCases) { s in Text("\(s.label)  \(s.name)").tag(s) }
+            Picker("Rozmiar", selection: $draft.size) {
+                ForEach(KafelekSize.allCases) { s in Text("\(s.name) \(s.label)").tag(s) }
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .frame(maxWidth: 520)
+            .frame(maxWidth: 460)
 
-            Spacer(minLength: 0)
             GeometryReader { geo in
-                let pts = previewSize.points
-                let scale = min(1.4, min((geo.size.width - 40) / pts.width, (geo.size.height - 20) / pts.height))
+                let pts = draft.size.points
+                let scale = min(1.5, min((geo.size.width - 40) / pts.width, (geo.size.height - 20) / pts.height))
                 TimelineView(TickSchedule(interval: 1)) { tl in
-                    KafelekTile(design: draft, ctx: RenderContext(now: tl.date, size: previewSize, snapshot: hub.snapshot,
+                    KafelekTile(design: draft, ctx: RenderContext(now: tl.date, size: draft.size, snapshot: hub.snapshot,
                                                                  photos: PhotoStore.images(for: [draft]), isWidget: false, interactive: false))
-                        .shadow(color: .black.opacity(0.3), radius: 18, y: 8)
+                        .shadow(color: .black.opacity(0.25), radius: 16, y: 6)
                         .scaleEffect(max(0.3, scale))
                         .frame(width: geo.size.width, height: geo.size.height)
                 }
             }
-            Spacer(minLength: 0)
-
-            VStack(spacing: 4) {
-                Text("Jak go postawić na pulpicie?")
-                    .font(.headline)
-                Text("Kliknij prawym na tapecie → **Edytuj widżety** → wyszukaj **Kafelek** → przeciągnij rozmiar na pulpit → prawy klik na widżecie → **Edytuj „Kafelek”** → wybierz **\(draft.name)**.")
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.secondary)
-                    .font(.callout)
-                    .frame(maxWidth: 460)
-            }
         }
         .padding(24)
-        .background(
-            LinearGradient(colors: [Color(hex: "#5B6B7A"), Color(hex: "#2B3440")], startPoint: .topLeading, endPoint: .bottomTrailing)
-                .opacity(0.35)
-        )
+        .background(DesktopBackdrop())
     }
+}
+
+/// Tło podglądu – coś jak tapeta, żeby szkło i kolory wyglądały jak na pulpicie.
+struct DesktopBackdrop: View {
+    var body: some View {
+        LinearGradient(colors: [Color(hex: "#C9C1B2"), Color(hex: "#8E9AAF"), Color(hex: "#4A5568")],
+                       startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+}
+
+// MARK: - Zdjęcia
+
+struct PhotosEditor: View {
+    @Binding var design: Design
+    @State private var pickerItems: [PhotosPickerItem] = []
+    @State private var dropTargeted = false
+    @State private var importing = false
+
+    private static let intervals: [(Int, String)] = [
+        (5, "5 min"), (15, "15 min"), (30, "30 min"), (60, "1 godz."), (180, "3 godz."),
+        (360, "6 godz."), (720, "12 godz."), (1440, "1 dzień"),
+    ]
+
+    var body: some View {
+        if design.kind == .photo {
+            Section {
+                dropZone
+                HStack {
+                    PhotosPicker(selection: $pickerItems, maxSelectionCount: 30, matching: .images) {
+                        Label("Z biblioteki Zdjęć", systemImage: "photo.on.rectangle")
+                    }
+                    Button {
+                        add(urls: pickFiles(multiple: true))
+                    } label: {
+                        Label("Z plików…", systemImage: "folder")
+                    }
+                    if importing { ProgressView().controlSize(.small) }
+                }
+            } header: {
+                Text("Zdjęcia (\(design.photo.photoIDs.count))")
+            } footer: {
+                Text("Dodaj jedno zdjęcie albo kilka – wtedy będą się zmieniać same.")
+            }
+            if !design.photo.photoIDs.isEmpty {
+                Section {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 76), spacing: 8)], spacing: 8) {
+                        ForEach(design.photo.photoIDs, id: \.self) { id in
+                            thumb(id)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+                Section("Wyświetlanie") {
+                    if design.photo.photoIDs.count > 1 {
+                        Picker("Zmieniaj co", selection: $design.photo.intervalMinutes) {
+                            ForEach(Self.intervals, id: \.0) { Text($0.1).tag($0.0) }
+                        }
+                    }
+                    Toggle("Wypełnij cały widżet (przytnij)", isOn: $design.photo.fill)
+                    Picker("Kadr", selection: $design.photo.align) {
+                        ForEach(PhotoAlign.allCases) { Text($0.title).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    TextField("Podpis (opcjonalnie)", text: $design.photo.caption)
+                }
+            }
+        } else {
+            Section("Zdjęcie w tle") {
+                if let id = design.style.photoID, let img = PhotoStore.image(id) {
+                    Image(nsImage: img).resizable().scaledToFill().frame(height: 120).clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+                HStack {
+                    Button(design.style.photoID == nil ? "Wybierz zdjęcie…" : "Zmień zdjęcie…") {
+                        if let url = pickFiles(multiple: false).first, let id = PhotoStore.importImage(from: url) {
+                            design.style.photoID = id
+                            design.style.background = .photo
+                        }
+                    }
+                    if design.style.background == .photo {
+                        Button("Usuń tło") { design.style.background = .solid }
+                    }
+                }
+                if design.style.background == .photo {
+                    LabeledContent("Przyciemnienie") {
+                        Slider(value: $design.style.photoDim, in: 0...0.8)
+                    }
+                }
+                Text("Chcesz widżet z samymi zdjęciami albo albumem? Zmień rodzaj na **Zdjęcie** w zakładce Widżet.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var dropZone: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "photo.badge.plus")
+                .font(.system(size: 30))
+                .foregroundStyle(.secondary)
+            Text("Przeciągnij tu zdjęcia")
+                .font(.headline)
+            Text("z Findera, Zdjęć albo przeglądarki")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, minHeight: 130)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [6, 5]))
+                .foregroundStyle(dropTargeted ? Color.accentColor : Color.secondary.opacity(0.4))
+        )
+        .onDrop(of: [.fileURL, .image], isTargeted: $dropTargeted) { providers in
+            handleDrop(providers)
+            return true
+        }
+        .onChange(of: pickerItems) { _, items in
+            guard !items.isEmpty else { return }
+            importing = true
+            let binding = $design
+            Task {
+                for item in items {
+                    if let data = try? await item.loadTransferable(type: Data.self),
+                       let id = PhotoStore.importImage(data: data) {
+                        await MainActor.run { binding.wrappedValue.photo.photoIDs.append(id) }
+                    }
+                }
+                await MainActor.run {
+                    pickerItems = []
+                    importing = false
+                }
+            }
+        }
+    }
+
+    private func thumb(_ id: String) -> some View {
+        ZStack(alignment: .topTrailing) {
+            if let img = PhotoStore.image(id) {
+                Image(nsImage: img)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 76, height: 76)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            } else {
+                RoundedRectangle(cornerRadius: 10).fill(.quaternary).frame(width: 76, height: 76)
+            }
+            Button {
+                design.photo.photoIDs.removeAll { $0 == id }
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .symbolRenderingMode(.palette)
+                    .foregroundStyle(.white, .black.opacity(0.6))
+                    .font(.system(size: 16))
+            }
+            .buttonStyle(.plain)
+            .padding(3)
+        }
+    }
+
+    private func add(urls: [URL]) {
+        for url in urls {
+            if let id = PhotoStore.importImage(from: url) { design.photo.photoIDs.append(id) }
+        }
+    }
+
+    private func handleDrop(_ providers: [NSItemProvider]) {
+        let binding = $design
+        for p in providers {
+            if p.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+                _ = p.loadObject(ofClass: URL.self) { url, _ in
+                    guard let url, let id = PhotoStore.importImage(from: url) else { return }
+                    DispatchQueue.main.async { binding.wrappedValue.photo.photoIDs.append(id) }
+                }
+            } else if p.canLoadObject(ofClass: NSImage.self) {
+                _ = p.loadObject(ofClass: NSImage.self) { obj, _ in
+                    guard let img = obj as? NSImage, let tiff = img.tiffRepresentation,
+                          let id = PhotoStore.importImage(data: tiff) else { return }
+                    DispatchQueue.main.async { binding.wrappedValue.photo.photoIDs.append(id) }
+                }
+            }
+        }
+    }
+}
+
+func pickFiles(multiple: Bool) -> [URL] {
+    let panel = NSOpenPanel()
+    panel.allowedContentTypes = [.image]
+    panel.allowsMultipleSelection = multiple
+    panel.canChooseDirectories = false
+    panel.directoryURL = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask).first
+    panel.message = "Wybierz zdjęcia do widżetu"
+    guard panel.runModal() == .OK else { return [] }
+    return panel.urls
 }
 
 // MARK: - Opcje zależne od rodzaju
@@ -252,16 +467,8 @@ struct KindOptionsEditor: View {
 
     private var photo: some View {
         Section("Zdjęcie") {
-            HStack {
-                if let id = design.photo.photoID, let img = PhotoStore.image(id) {
-                    Image(nsImage: img).resizable().scaledToFill().frame(width: 54, height: 54).clipShape(RoundedRectangle(cornerRadius: 8))
-                }
-                Button(design.photo.photoID == nil ? "Wybierz zdjęcie…" : "Zmień zdjęcie…") {
-                    if let id = pickPhoto() { design.photo.photoID = id }
-                }
-            }
-            TextField("Podpis (opcjonalnie)", text: $design.photo.caption)
-            Toggle("Wypełnij cały kafelek", isOn: $design.photo.fill)
+            Text("Zdjęcia dodajesz w zakładce **Zdjęcia** (przeciągnij, z biblioteki Zdjęć albo z plików). Kilka zdjęć = album, który sam się zmienia.")
+                .foregroundStyle(.secondary)
         }
     }
 

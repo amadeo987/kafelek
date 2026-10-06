@@ -94,24 +94,38 @@ struct CountdownTile: View {
     }
 }
 
-// MARK: - Zdjęcie
+// MARK: - Zdjęcie / album
 
 struct PhotoTile: View {
     let d: Design
     let ctx: RenderContext
 
+    private var image: NSImage? {
+        if let id = d.photo.currentID(at: ctx.now), let img = ctx.photos[id] { return img }
+        return d.photo.photoIDs.lazy.compactMap { ctx.photos[$0] }.first
+    }
+
+    private var alignment: Alignment {
+        switch d.photo.align {
+        case .top: .top
+        case .center: .center
+        case .bottom: .bottom
+        }
+    }
+
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            if let id = d.photo.photoID, let img = ctx.photos[id] {
+            if let img = image {
                 GeometryReader { geo in
                     Image(nsImage: img)
                         .resizable()
                         .aspectRatio(contentMode: d.photo.fill ? .fill : .fit)
-                        .frame(width: geo.size.width, height: geo.size.height)
+                        .frame(width: geo.size.width, height: geo.size.height, alignment: alignment)
                         .clipped()
                 }
             } else {
-                TileMessage(symbol: "photo.badge.plus", title: "Wybierz zdjęcie", detail: "w edytorze kafelka", style: d.style)
+                TileMessage(symbol: "photo.on.rectangle.angled", title: "Dodaj zdjęcia",
+                            detail: "w aplikacji Kafelek", style: d.style)
             }
             if !d.photo.caption.isEmpty {
                 Text(d.photo.caption)
