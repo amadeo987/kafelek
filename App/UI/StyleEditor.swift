@@ -82,7 +82,7 @@ struct StyleEditor: View {
                 ForEach(TextAlign.allCases) { Text($0.title).tag($0) }
             }
             .pickerStyle(.segmented)
-            LabeledContent("Wielkość tekstu \(Int(style.textScale * 100))%") {
+            LabeledContent("Wielkość tekstu " + Fmt.percent(style.textScale * 100)) {
                 Slider(value: $style.textScale, in: 0.6...1.6, step: 0.05)
             }
             LabeledContent("Margines \(Int(style.padding))") {

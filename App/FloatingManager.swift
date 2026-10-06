@@ -148,7 +148,7 @@ struct FloatingTileHost: View {
                 }
                 Menu("Skala") {
                     ForEach([0.75, 0.9, 1.0, 1.15, 1.3, 1.5], id: \.self) { sc in
-                        Button("\(Int(sc * 100))%") {
+                        Button(Fmt.percent(sc * 100)) {
                             var it = item
                             it.scale = sc
                             store.updateDesktop(it)

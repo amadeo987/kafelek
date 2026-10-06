@@ -380,7 +380,7 @@ struct BatteryTile: View {
                             Image(systemName: b.charging ? "bolt.fill" : "laptopcomputer")
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundStyle(color)
-                            Text("\(b.percent)%").font(s.font(24, .bold)).monospacedDigit()
+                            Text(verbatim: "\(b.percent)%").font(s.font(24, .bold)).monospacedDigit()
                         }
                     }
                     .frame(width: 100, height: 100)
@@ -398,7 +398,7 @@ struct BatteryTile: View {
                     .frame(width: 110, height: 110)
                     VStack(alignment: .leading, spacing: 4) {
                         Text("MacBook").font(s.caption(12, .bold)).foregroundStyle(s.accent)
-                        Text("\(b.percent)%").font(s.font(48, .bold)).monospacedDigit()
+                        Text(verbatim: "\(b.percent)%").font(s.font(48, .bold)).monospacedDigit()
                         Text(status).font(s.caption(13, .semibold)).foregroundStyle(s.secondary)
                         if let m = b.minutesRemaining, m > 0 {
                             Text(b.charging ? "pełna za \(m / 60) h \(m % 60) min" : "zostało \(m / 60) h \(m % 60) min")

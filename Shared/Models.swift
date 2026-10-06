@@ -634,6 +634,10 @@ struct Library: Codable {
     var desktop: [DesktopItem] = []
     var settings = AppSettings()
 
+    enum CodingKeys: String, CodingKey {
+        case version, designs, schedules, desktop, settings
+    }
+
     init() {}
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -647,7 +651,7 @@ struct Library: Codable {
     /// Jeden uszkodzony element nie może skasować całej listy.
     private static func lossy<T: Decodable>(_ c: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys) -> [T] {
         guard let items = try? c.decodeIfPresent([Lossy<T>].self, forKey: key) else { return [] }
-        return items.compactMap(\.value)
+        return items.compactMap { $0.value }
     }
 
     func design(_ id: UUID?) -> Design? {
