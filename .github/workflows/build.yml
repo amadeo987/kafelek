@@ -53,6 +53,22 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "$APP"
           lipo -archs "$APP/Contents/MacOS/Kafelek"
 
+      - name: Test uruchomienia (serwer dla widżetu + rejestracja widżetu)
+        continue-on-error: true
+        run: |
+          APP="$PWD/build/Build/Products/Release/Kafelek.app"
+          cp -R "$APP" /Applications/
+          open /Applications/Kafelek.app
+          sleep 12
+          pgrep -lf Kafelek || echo "!! Kafelek nie działa"
+          echo "--- ping"; curl -s -i http://127.0.0.1:47863/v1/ping | head -12
+          echo "--- library"; curl -s http://127.0.0.1:47863/v1/library | head -c 600; echo
+          echo "--- snapshot"; curl -s http://127.0.0.1:47863/v1/snapshot | head -c 600; echo
+          echo "--- pluginkit"; pluginkit -m -v -i pl.amadeo.kafelek.widget || true
+          pluginkit -m -A -D -p com.apple.widgetkit-extension | grep -i kafelek || echo "!! widżet nie jest zarejestrowany"
+          echo "--- crash logs"; ls ~/Library/Logs/DiagnosticReports 2>/dev/null | grep -i kafelek || echo "brak"
+          pkill -x Kafelek || true
+
       - name: Spakuj (zip + dmg)
         run: |
           APP=build/Build/Products/Release/Kafelek.app
