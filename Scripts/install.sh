@@ -36,7 +36,11 @@ xattr -dr com.apple.quarantine "$DEST" 2>/dev/null || true
 # Zarejestruj rozszerzenie widżetu w systemie.
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$DEST" >/dev/null 2>&1 || true
 
+# Odśwież ikonę w Docku/Launchpadzie (macOS trzyma starą w pamięci podręcznej).
+touch "$DEST"
+killall Dock 2>/dev/null || true
+
 echo "🚀 Uruchamiam…"
 open "$DEST"
-echo "✅ Gotowe! Ikonka Kafelka jest na pasku menu (▦)."
+echo "✅ Gotowe! Okno Kafelka otworzysz z Launchpada albo Spotlight (⌘ Spacja → Kafelek)."
 echo "   Widżety: prawy klik na tapecie → Edytuj widżety → wyszukaj „Kafelek”."

@@ -13,6 +13,7 @@ final class DataHub: ObservableObject {
 
     let calendar = CalendarSource()
     let ai = AISource()
+    let systemSource = SystemSource()
 
     private var store: LibraryStore { LibraryStore.shared }
     private var timer: Timer?
@@ -49,6 +50,7 @@ final class DataHub: ObservableObject {
         var reminders = false
         var ai = false
         var battery = false
+        var system = false
         var weather: [String: WeatherOptions] = [:]
         var crypto: Set<String> = []
     }
@@ -61,6 +63,9 @@ final class DataHub: ObservableObject {
             case .reminders: d.reminders = true
             case .ai: d.ai = true
             case .battery: d.battery = true
+            case .system:
+                d.system = true
+                if design.system.metrics.contains(.battery) { d.battery = true }
             case .weather, .astronomy: d.weather[design.weather.key] = design.weather
             case .crypto:
                 for s in design.crypto.symbols {
@@ -97,6 +102,10 @@ final class DataHub: ObservableObject {
             snapshot.battery = BatterySource.read()
             published(urgent: false)
         }
+        if d.system && due("system", every: 60, force: force) {
+            snapshot.system = systemSource.read()
+            published(urgent: false)
+        }
         if !d.weather.isEmpty && due("weather", every: 30 * 60, force: force) {
             let locations = Array(d.weather.values)
             Task { await refreshWeather(locations) }
@@ -114,6 +123,7 @@ final class DataHub: ObservableObject {
         if d.reminders && snapshot.reminders.isEmpty && snapshot.remindersAccess != .denied { Task { await refreshReminders() } }
         if d.ai && snapshot.claude == nil && snapshot.codex == nil { Task { await refreshAI() } }
         if d.battery && snapshot.battery == nil { snapshot.battery = BatterySource.read() }
+        if d.system && snapshot.system == nil { snapshot.system = systemSource.read() }
         let missingWeather = d.weather.filter { snapshot.weather[$0.key] == nil }.map(\.value)
         if !missingWeather.isEmpty { Task { await refreshWeather(missingWeather) } }
         let missingCrypto = d.crypto.filter { snapshot.crypto[$0] == nil }

@@ -297,6 +297,7 @@ struct KafelekEntry: TimelineEntry {
     let snapshot: Snapshot
     let photos: [String: NSImage]
     let message: String?
+    var gallery = false
 }
 
 extension KafelekSize {
@@ -367,7 +368,11 @@ struct KafelekProvider: AppIntentTimelineProvider {
     }
 
     func snapshot(for configuration: SelectKafelekIntent, in context: Context) async -> KafelekEntry {
-        await entries(configuration, context, single: true).first ?? placeholder(in: context)
+        // W galerii widżetów: czysty podgląd jak w Widgetsmith – wybór projektu dopiero po dodaniu.
+        if context.isPreview && configuration.kafelek == nil {
+            return KafelekEntry(date: Date(), design: nil, snapshot: Snapshot(), photos: [:], message: nil, gallery: true)
+        }
+        return await entries(configuration, context, single: true).first ?? placeholder(in: context)
     }
 
     func timeline(for configuration: SelectKafelekIntent, in context: Context) async -> Timeline<KafelekEntry> {
@@ -452,6 +457,9 @@ struct EntryView: View {
                         KafelekBackground(style: design.style, ctx: ctx)
                     }
             }
+        } else if entry.gallery {
+            GalleryPlaceholder(size: KafelekSize(family))
+                .containerBackground(for: .widget) { Color(hex: "#161617") }
         } else {
             VStack(spacing: 8) {
                 Image(systemName: "square.grid.2x2.fill")
@@ -465,5 +473,34 @@ struct EntryView: View {
             .padding()
             .containerBackground(.fill.tertiary, for: .widget)
         }
+    }
+}
+
+
+/// Podgląd w galerii „Edytuj widżety”.
+struct GalleryPlaceholder: View {
+    let size: KafelekSize
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 5) {
+                RoundedRectangle(cornerRadius: 3).fill(Color.white).frame(width: 10, height: 16)
+                VStack(spacing: 3) {
+                    RoundedRectangle(cornerRadius: 3).fill(Color.white.opacity(0.35)).frame(width: 10, height: 6.5)
+                    RoundedRectangle(cornerRadius: 3).fill(Color.white.opacity(0.8)).frame(width: 10, height: 6.5)
+                }
+            }
+            Spacer(minLength: 0)
+            Text("Twój widżet")
+                .font(.system(size: size == .small ? 15 : 18, weight: .semibold))
+                .foregroundStyle(.white)
+            Text(size == .small ? "Po dodaniu wybierz, który pokazać."
+                                : "Po dodaniu: prawy klik → Edytuj widżet → wybierz jeden z Twoich widżetów z Kafelka.")
+                .font(.system(size: 11))
+                .foregroundStyle(.white.opacity(0.55))
+                .lineLimit(3)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }

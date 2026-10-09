@@ -128,3 +128,75 @@ enum BatterySource {
         return nil
     }
 }
+
+// MARK: - System (procesor, RAM, dysk) – lokalnie, bez uprawnień
+
+final class SystemSource {
+    private var lastTicks: (busy: Double, total: Double)?
+
+    func read() -> SystemStats {
+        SystemStats(cpu: cpuUsage(), memoryUsed: memoryUsed(), memoryTotal: Double(ProcessInfo.processInfo.physicalMemory),
+                    diskFree: disk().free, diskTotal: disk().total, updatedAt: Date())
+    }
+
+    private func cpuUsage() -> Double {
+        var info = host_cpu_load_info_data_t()
+        var count = mach_msg_type_number_t(MemoryLayout<host_cpu_load_info_data_t>.stride / MemoryLayout<integer_t>.stride)
+        let result = withUnsafeMutablePointer(to: &info) { ptr in
+            ptr.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                host_statistics(mach_host_self(), HOST_CPU_LOAD_INFO, $0, &count)
+            }
+        }
+        guard result == KERN_SUCCESS else { return 0 }
+        let user = Double(info.cpu_ticks.0), system = Double(info.cpu_ticks.1)
+        let idle = Double(info.cpu_ticks.2), nice = Double(info.cpu_ticks.3)
+        let busy = user + system + nice
+        let total = busy + idle
+        defer { lastTicks = (busy, total) }
+        guard let last = lastTicks, total > last.total else {
+            return total > 0 ? busy / total * 100 : 0
+        }
+        return (busy - last.busy) / (total - last.total) * 100
+    }
+
+    private func memoryUsed() -> Double {
+        var vm = vm_statistics64_data_t()
+        var count = mach_msg_type_number_t(MemoryLayout<vm_statistics64_data_t>.stride / MemoryLayout<integer_t>.stride)
+        let result = withUnsafeMutablePointer(to: &vm) { ptr in
+            ptr.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                host_statistics64(mach_host_self(), HOST_VM_INFO64, $0, &count)
+            }
+        }
+        guard result == KERN_SUCCESS else { return 0 }
+        let page = Double(vm_kernel_page_size)
+        // Jak w Monitorze aktywności: pamięć aplikacji + przewodowa + skompresowana.
+        let app = Double(vm.internal_page_count) - Double(vm.purgeable_count)
+        return (app + Double(vm.wire_count) + Double(vm.compressor_page_count)) * page
+    }
+
+    private func disk() -> (free: Double, total: Double) {
+        let url = URL(fileURLWithPath: "/")
+        guard let v = try? url.resourceValues(forKeys: [.volumeTotalCapacityKey, .volumeAvailableCapacityForImportantUsageKey]) else {
+            return (0, 0)
+        }
+        return (Double(v.volumeAvailableCapacityForImportantUsage ?? 0), Double(v.volumeTotalCapacity ?? 0))
+    }
+}
+
+// MARK: - Skróty Apple (lista i uruchamianie)
+
+enum ShortcutsSource {
+    /// Nazwy skrótów użytkownika (polecenie `shortcuts list`).
+    static func list() async -> [String] {
+        await Task.detached {
+            let r = Shell.run("/usr/bin/shortcuts", ["list"], timeout: 20)
+            return r.stdout.split(separator: "\n").map { String($0).trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.sorted()
+        }.value
+    }
+
+    static func run(_ name: String) {
+        Task.detached {
+            _ = Shell.run("/usr/bin/shortcuts", ["run", name], timeout: 300)
+        }
+    }
+}

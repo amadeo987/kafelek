@@ -65,7 +65,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             openMain(selecting: nil)
         } else if !launchedAtLogin {
             // Uruchomiony ręcznie (Launchpad, Spotlight, Aplikacje) – pokaż okno.
-            openMain(selecting: nil)
+            // Nie, gdy obudziło nas kliknięcie w widżet (adres kafelek://).
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+                guard let self, !self.openedViaURL else { return }
+                self.openMain(selecting: nil)
+            }
         }
         if store.library.settings.autoUpdateCheck {
             Task {
@@ -81,6 +85,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             }
         }
         WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    // MARK: Kliknięcia w widżet (kafelek://…)
+
+    private var openedViaURL = false
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls where url.scheme == "kafelek" {
+            openedViaURL = true
+            handle(url)
+        }
+    }
+
+    private func handle(_ url: URL) {
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        var q: [String: String] = [:]
+        for item in items { q[item.name] = item.value ?? "" }
+        switch url.host {
+        case "action":
+            guard let did = UUID(uuidString: q["d"] ?? ""), let aid = UUID(uuidString: q["a"] ?? ""),
+                  let design = store.design(did),
+                  let action = design.shortcuts.actions.first(where: { $0.id == aid }) else { return }
+            perform(action)
+        default:
+            openMain(selecting: q["ref"])
+        }
+    }
+
+    func perform(_ a: ActionItem) {
+        switch a.type {
+        case .shortcut:
+            ShortcutsSource.run(a.value)
+        case .app:
+            NSWorkspace.shared.openApplication(at: URL(fileURLWithPath: a.value), configuration: NSWorkspace.OpenConfiguration())
+        case .url:
+            let raw = a.value.contains("://") ? a.value : "https://" + a.value
+            if let u = URL(string: raw) { NSWorkspace.shared.open(u) }
+        }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

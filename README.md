@@ -49,6 +49,8 @@ Każdy widżet może pokazywać inny projekt, więc dodajesz ich tyle, ile chces
 | **Kurs krypto** | BTC, ETH… z wykresem 24 h (publiczne API Binance) |
 | **Bateria** | bateria Maca |
 | **Słońce i Księżyc** | wschód i zachód słońca, faza Księżyca |
+| **Skróty i akcje** | przyciski uruchamiające Skróty Apple, aplikacje i linki |
+| **System Maca** | procesor, RAM, dysk, bateria – pierścienie albo paski |
 
 Do tego:
 - **Styl:** 12 motywów, kolor albo gradient albo zdjęcie w tle, kolor tekstu i akcentu, czcionka, grubość, wyrównanie, wielkość, ramka.

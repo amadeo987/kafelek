@@ -14,6 +14,20 @@ struct Snapshot: Codable {
     var weather: [String: WeatherData] = [:]
     var crypto: [String: CryptoQuote] = [:]
     var battery: BatteryInfo?
+    var system: SystemStats?
+}
+
+struct SystemStats: Codable, Hashable {
+    /// Zużycie procesora 0–100.
+    var cpu: Double
+    var memoryUsed: Double
+    var memoryTotal: Double
+    var diskFree: Double
+    var diskTotal: Double
+    var updatedAt: Date
+
+    var memoryPercent: Double { memoryTotal > 0 ? memoryUsed / memoryTotal * 100 : 0 }
+    var diskUsedPercent: Double { diskTotal > 0 ? (diskTotal - diskFree) / diskTotal * 100 : 0 }
 }
 
 enum AccessState: String, Codable {

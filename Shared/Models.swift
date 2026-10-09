@@ -53,7 +53,7 @@ enum KafelekSize: String, Codable, CaseIterable, Identifiable {
 // MARK: - Rodzaje kafelków
 
 enum DesignKind: String, Codable, CaseIterable, Identifiable {
-    case clock, date, calendar, reminders, ai, note, countdown, photo, weather, crypto, battery, astronomy
+    case clock, date, calendar, reminders, ai, note, countdown, photo, weather, crypto, battery, astronomy, shortcuts, system
 
     var id: String { rawValue }
 
@@ -71,6 +71,8 @@ enum DesignKind: String, Codable, CaseIterable, Identifiable {
         case .crypto: "Kurs krypto"
         case .battery: "Bateria"
         case .astronomy: "Słońce i Księżyc"
+        case .shortcuts: "Skróty i akcje"
+        case .system: "System Maca"
         }
     }
 
@@ -88,6 +90,8 @@ enum DesignKind: String, Codable, CaseIterable, Identifiable {
         case .crypto: "bitcoinsign.circle.fill"
         case .battery: "battery.75percent"
         case .astronomy: "moon.stars.fill"
+        case .shortcuts: "bolt.square.fill"
+        case .system: "cpu"
         }
     }
 }
@@ -478,6 +482,91 @@ struct CryptoOptions: Codable, Hashable {
     }
 }
 
+// MARK: - Skróty i akcje
+
+enum ActionType: String, Codable, CaseIterable, Identifiable {
+    case shortcut, app, url
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .shortcut: "Skrót (Skróty Apple)"
+        case .app: "Aplikacja"
+        case .url: "Link / strona"
+        }
+    }
+}
+
+struct ActionItem: Codable, Identifiable, Hashable {
+    var id = UUID()
+    var type: ActionType = .shortcut
+    var title = "Akcja"
+    /// Nazwa skrótu, ścieżka aplikacji albo adres URL.
+    var value = ""
+    var symbol = "bolt.fill"
+    var colorHex = "#3A3A3C"
+    /// Ikona aplikacji zapisana jako zdjęcie (opcjonalnie).
+    var iconID: String?
+
+    init() {}
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = c.v(.id, id)
+        type = c.v(.type, type)
+        title = c.v(.title, title)
+        value = c.v(.value, value)
+        symbol = c.v(.symbol, symbol)
+        colorHex = c.v(.colorHex, colorHex)
+        iconID = c.v(.iconID, iconID)
+    }
+}
+
+struct ShortcutsOptions: Codable, Hashable {
+    var actions: [ActionItem] = []
+    var showLabels = true
+
+    init() {}
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        actions = c.v(.actions, actions)
+        showLabels = c.v(.showLabels, showLabels)
+    }
+}
+
+// MARK: - System Maca
+
+enum SystemMetric: String, Codable, CaseIterable, Identifiable {
+    case cpu, memory, disk, battery
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .cpu: "Procesor"
+        case .memory: "Pamięć RAM"
+        case .disk: "Dysk"
+        case .battery: "Bateria"
+        }
+    }
+    var symbol: String {
+        switch self {
+        case .cpu: "cpu"
+        case .memory: "memorychip"
+        case .disk: "internaldrive"
+        case .battery: "battery.75percent"
+        }
+    }
+}
+
+struct SystemOptions: Codable, Hashable {
+    var metrics: [SystemMetric] = [.cpu, .memory, .disk, .battery]
+    var display: AIDisplayStyle = .rings
+
+    init() {}
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        metrics = c.v(.metrics, metrics)
+        display = c.v(.display, display)
+    }
+}
+
 // MARK: - Projekt kafelka
 
 struct Design: Codable, Identifiable, Hashable {
@@ -497,6 +586,8 @@ struct Design: Codable, Identifiable, Hashable {
     var photo = PhotoOptions()
     var weather = WeatherOptions()
     var crypto = CryptoOptions()
+    var shortcuts = ShortcutsOptions()
+    var system = SystemOptions()
     var createdAt = Date()
 
     init() {}
@@ -518,6 +609,8 @@ struct Design: Codable, Identifiable, Hashable {
         photo = c.v(.photo, photo)
         weather = c.v(.weather, weather)
         crypto = c.v(.crypto, crypto)
+        shortcuts = c.v(.shortcuts, shortcuts)
+        system = c.v(.system, system)
         createdAt = c.v(.createdAt, createdAt)
     }
 
@@ -534,6 +627,7 @@ struct Design: Codable, Identifiable, Hashable {
         var ids: [String] = []
         if style.background == .photo, let p = style.photoID { ids.append(p) }
         if kind == .photo { ids.append(contentsOf: photo.photoIDs) }
+        if kind == .shortcuts { ids.append(contentsOf: shortcuts.actions.compactMap(\.iconID)) }
         return ids
     }
 
@@ -542,6 +636,7 @@ struct Design: Codable, Identifiable, Hashable {
         var ids: [String] = []
         if style.background == .photo, let p = style.photoID { ids.append(p) }
         if kind == .photo, let p = photo.currentID(at: date) { ids.append(p) }
+        if kind == .shortcuts { ids.append(contentsOf: shortcuts.actions.compactMap(\.iconID)) }
         return ids
     }
 }

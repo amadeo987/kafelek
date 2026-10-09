@@ -41,6 +41,8 @@ struct KafelekContent: View {
         case .crypto: CryptoTile(d: design, ctx: ctx)
         case .battery: BatteryTile(d: design, ctx: ctx)
         case .astronomy: AstronomyTile(d: design, ctx: ctx)
+        case .shortcuts: ShortcutsTile(d: design, ctx: ctx)
+        case .system: SystemTile(d: design, ctx: ctx)
         }
     }
 }

@@ -17,6 +17,19 @@ struct EditorView: View {
     @State private var draft = Design()
     @State private var loaded = false
     @State private var tab: EditorTab = .widget
+    @State private var justSaved = false
+
+    /// Zmiany i tak zapisują się na bieżąco – przycisk dodatkowo odświeża widżety i zamyka edytor.
+    private func save(close: Bool) {
+        store.upsert(draft)
+        store.save()
+        DataHub.shared.scheduleWidgetReload(urgent: true)
+        withAnimation { justSaved = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+            withAnimation { justSaved = false }
+            if close { Navigation.shared.selection = .gallery }
+        }
+    }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -51,6 +64,23 @@ struct EditorView: View {
                     Label("Moje widżety", systemImage: "chevron.left")
                 }
                 .help("Wróć do moich widżetów")
+            }
+            ToolbarItem(placement: .primaryAction) {
+                HStack(spacing: 10) {
+                    if justSaved {
+                        Label("Zapisano", systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                            .transition(.opacity)
+                    }
+                    Button {
+                        save(close: true)
+                    } label: {
+                        Label("Zapisz", systemImage: "checkmark")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut("s", modifiers: .command)
+                    .help("Zapisz i wróć do moich widżetów (⌘S)")
+                }
             }
         }
         .onAppear {
@@ -357,6 +387,31 @@ struct KindOptionsEditor: View {
                 Text("Pokazuje poziom baterii tego Maca. Odświeżanie co 2 min.")
                     .foregroundStyle(.secondary)
             }
+        case .shortcuts:
+            ShortcutsEditor(options: $design.shortcuts)
+        case .system:
+            Section("System Maca") {
+                ForEach(SystemMetric.allCases) { m in
+                    Toggle(isOn: Binding(
+                        get: { design.system.metrics.contains(m) },
+                        set: { on in
+                            if on {
+                                design.system.metrics = SystemMetric.allCases.filter { design.system.metrics.contains($0) || $0 == m }
+                            } else {
+                                design.system.metrics.removeAll { $0 == m }
+                            }
+                        }
+                    )) {
+                        Label(m.title, systemImage: m.symbol)
+                    }
+                }
+                Picker("Wygląd", selection: $design.system.display) {
+                    ForEach(AIDisplayStyle.allCases) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                Text("Odświeżanie co minutę, tylko gdy masz taki widżet.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
         }
     }
 
@@ -622,6 +677,160 @@ struct PlaceSearch: View {
             await MainActor.run {
                 results = found
                 searching = false
+            }
+        }
+    }
+}
+
+
+// MARK: - Edytor skrótów i akcji
+
+struct ShortcutsEditor: View {
+    @Binding var options: ShortcutsOptions
+    @State private var shortcutNames: [String] = []
+    @State private var loading = true
+
+    static let symbols = ["bolt.fill", "star.fill", "heart.fill", "house.fill", "folder.fill", "doc.fill", "terminal.fill",
+                          "globe", "play.rectangle.fill", "music.note", "camera.fill", "message.fill", "envelope.fill",
+                          "calendar", "checklist", "timer", "moon.fill", "sun.max.fill", "lightbulb.fill", "lock.fill",
+                          "chart.line.uptrend.xyaxis", "bitcoinsign.circle.fill", "sparkle", "gearshape.fill",
+                          "wifi", "speaker.wave.2.fill", "airpodspro", "display", "printer.fill", "cart.fill"]
+
+    var body: some View {
+        Section {
+            if options.actions.isEmpty {
+                Text("Brak akcji – dodaj poniżej.").foregroundStyle(.secondary)
+            }
+            ForEach($options.actions) { $action in
+                ActionRow(action: $action, shortcutNames: shortcutNames) {
+                    options.actions.removeAll { $0.id == action.id }
+                } move: { delta in
+                    move(action.id, by: delta)
+                }
+            }
+        } header: {
+            Text("Akcje (\(options.actions.count))")
+        } footer: {
+            Text("Kliknięcie w widżecie uruchamia akcję. Mały widżet mieści 4, średni 8, duży 9, bardzo duży 12.")
+        }
+        Section("Dodaj") {
+            Menu {
+                if loading { Text("Wczytuję skróty…") }
+                if !loading && shortcutNames.isEmpty { Text("Nie znaleziono skrótów") }
+                ForEach(shortcutNames, id: \.self) { name in
+                    Button(name) {
+                        var a = ActionItem()
+                        a.type = .shortcut
+                        a.title = name
+                        a.value = name
+                        a.symbol = "bolt.fill"
+                        a.colorHex = "#5E5CE6"
+                        options.actions.append(a)
+                    }
+                }
+            } label: {
+                Label("Skrót z aplikacji Skróty", systemImage: "square.2.layers.3d")
+            }
+            Button {
+                addApp()
+            } label: {
+                Label("Aplikację…", systemImage: "app")
+            }
+            Button {
+                var a = ActionItem()
+                a.type = .url
+                a.title = "Strona"
+                a.value = "https://"
+                a.symbol = "globe"
+                a.colorHex = "#0A84FF"
+                options.actions.append(a)
+            } label: {
+                Label("Link / stronę", systemImage: "link")
+            }
+            Toggle("Podpisy pod ikonami", isOn: $options.showLabels)
+        }
+        .task {
+            shortcutNames = await ShortcutsSource.list()
+            loading = false
+        }
+    }
+
+    private func move(_ id: UUID, by delta: Int) {
+        guard let i = options.actions.firstIndex(where: { $0.id == id }) else { return }
+        let j = i + delta
+        guard j >= 0, j < options.actions.count else { return }
+        options.actions.swapAt(i, j)
+    }
+
+    private func addApp() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.application]
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
+        panel.allowsMultipleSelection = true
+        guard panel.runModal() == .OK else { return }
+        for url in panel.urls {
+            var a = ActionItem()
+            a.type = .app
+            a.title = url.deletingPathExtension().lastPathComponent
+            a.value = url.path
+            a.symbol = "app.fill"
+            a.iconID = PhotoStore.importIcon(NSWorkspace.shared.icon(forFile: url.path))
+            options.actions.append(a)
+        }
+    }
+}
+
+struct ActionRow: View {
+    @Binding var action: ActionItem
+    let shortcutNames: [String]
+    let onDelete: () -> Void
+    let move: (Int) -> Void
+
+    var body: some View {
+        DisclosureGroup {
+            TextField("Podpis", text: $action.title)
+            switch action.type {
+            case .shortcut:
+                Picker("Skrót", selection: $action.value) {
+                    if !shortcutNames.contains(action.value) { Text(action.value).tag(action.value) }
+                    ForEach(shortcutNames, id: \.self) { Text($0).tag($0) }
+                }
+            case .url:
+                TextField("Adres (https://…)", text: $action.value)
+            case .app:
+                LabeledContent("Aplikacja", value: URL(fileURLWithPath: action.value).lastPathComponent)
+            }
+            if action.iconID == nil {
+                Picker("Ikona", selection: $action.symbol) {
+                    ForEach(ShortcutsEditor.symbols, id: \.self) { sym in
+                        Label(sym, systemImage: sym).labelStyle(.iconOnly).tag(sym)
+                    }
+                }
+                ColorPicker("Kolor", selection: hexBinding($action.colorHex), supportsOpacity: false)
+            } else {
+                Button("Użyj symbolu zamiast ikony aplikacji") { action.iconID = nil }
+            }
+            HStack {
+                Button { move(-1) } label: { Image(systemName: "arrow.up") }
+                Button { move(1) } label: { Image(systemName: "arrow.down") }
+                Spacer()
+                Button("Usuń", role: .destructive, action: onDelete)
+            }
+        } label: {
+            HStack(spacing: 10) {
+                ZStack {
+                    if let id = action.iconID, let img = PhotoStore.image(id) {
+                        Image(nsImage: img).resizable().scaledToFit()
+                    } else {
+                        RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color(hex: action.colorHex))
+                        Image(systemName: action.symbol).font(.system(size: 11, weight: .semibold)).foregroundStyle(.white)
+                    }
+                }
+                .frame(width: 24, height: 24)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(action.title)
+                    Text(action.type.title).font(.caption).foregroundStyle(.secondary)
+                }
             }
         }
     }

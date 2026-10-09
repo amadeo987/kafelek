@@ -53,6 +53,24 @@ enum PhotoStore {
         }
     }
 
+    /// Ikona aplikacji (PNG z przezroczystością).
+    static func importIcon(_ image: NSImage) -> String? {
+        let size = NSSize(width: 256, height: 256)
+        let out = NSImage(size: size)
+        out.lockFocus()
+        image.draw(in: NSRect(origin: .zero, size: size), from: .zero, operation: .copy, fraction: 1)
+        out.unlockFocus()
+        guard let tiff = out.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
+              let png = rep.representation(using: .png, properties: [:]) else { return nil }
+        let id = UUID().uuidString
+        do {
+            try png.write(to: file(id), options: .atomic)
+            return id
+        } catch {
+            return nil
+        }
+    }
+
     static func delete(_ id: String) {
         cache.removeObject(forKey: id as NSString)
         try? FileManager.default.removeItem(at: file(id))
@@ -147,10 +165,18 @@ final class LibraryStore: ObservableObject {
                 }
                 lib.version = 2
             }
+            if lib.version < 3 {
+                // Usuń przykładowe cytaty z pierwszej wersji (jeśli nie były zmieniane).
+                let oldTexts = ["No Risk\nNo Porsche", "dreams don’t work unless you do.", "“I’m the reason I smile everyday.”"]
+                lib.designs.removeAll { $0.kind == .note && oldTexts.contains($0.note.text) }
+                let ids = Set(lib.designs.map { SlotRef.design($0.id).raw } + lib.schedules.map { SlotRef.schedule($0.id).raw })
+                lib.desktop.removeAll { !ids.contains($0.ref) }
+                lib.version = 3
+            }
             library = lib
         } else {
             var lib = Library()
-            lib.version = 2
+            lib.version = 3
             lib.designs = Templates.starter
             library = lib
             save()
